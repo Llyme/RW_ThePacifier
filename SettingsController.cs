@@ -10,10 +10,7 @@ namespace RW_ThePacifier
 			GetSettings<Settings>();
 		}
 
-		public override string SettingsCategory()
-		{
-			return "The Pacifier";
-		}
+		public override string SettingsCategory() => "The Pacifier";
 
 		public override void DoSettingsWindowContents(Rect inRect)
 		{
