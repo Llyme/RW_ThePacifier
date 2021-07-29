@@ -5,18 +5,10 @@ namespace RW_ThePacifier
 {
 	public class Settings : ModSettings
 	{
-		public const string DESCRIPTION_PLAYER =
-			"Pawns that belong to your faction.";
-
-		public const string DESCRIPTION_ALLY =
-			"Pawns that belong to an allied faction.";
-
-		public const string DESCRIPTION_ENEMY =
-			"Pawns that belong to a hostile faction.";
-
-		public const string DESCRIPTION_WILD =
-			"Pawns that do not belong to any factions.";
-
+		public const string DESCRIPTION_MAX_INJURIES =
+			"Pawns will die if they have more than this amount of injuries. " +
+			"Setting to 0 or below will allow unlimited injuries.\n" +
+			"Default: 1000";
 		public const string DESCRIPTION_DESTROY_THRESHOLD =
 			"The amount of severity needed for a " +
 			"single injury to fully destroy/amputate a body part. " +
@@ -25,6 +17,15 @@ namespace RW_ThePacifier
 			"while preventing serious injuries from " +
 			"destroying body parts.\n" +
 			"Default: 10000";
+
+		public const string DESCRIPTION_PLAYER =
+			"Pawns that belong to your faction.";
+		public const string DESCRIPTION_ALLY =
+			"Pawns that belong to an allied faction.";
+		public const string DESCRIPTION_ENEMY =
+			"Pawns that belong to a hostile faction.";
+		public const string DESCRIPTION_WILD =
+			"Pawns that do not belong to any factions.";
 
 		public const string DESCRIPTION_NO_DEATH =
 			"When enabled, pawns can no longer die. " +
@@ -66,13 +67,13 @@ namespace RW_ThePacifier
 			"This still requires them to be assigned to doctoring and allow self-tending, " +
 			"and can be interrupted by disallowing them.";
 
+		public const string MAX_INJURIES = "Max Injuries to Prevent Death";
+		public const string DESTROY_THRESHOLD = "Body Part Destroy Threshold";
+
 		public const string PLAYER = "Player";
 		public const string ALLY = "Ally";
 		public const string ENEMY = "Enemy";
 		public const string WILD = "Wild";
-
-		public static float DestroyThreshold = 10000f;
-		public static string DestroyThreshold_Buffer = null;
 
 		public const string NO_DEATH = "No Death";
 		public const string DEATH_WAKE = "Random Chance for Incapacitated Pawns to Stand Up";
@@ -82,7 +83,12 @@ namespace RW_ThePacifier
 		public const string NO_BLOOD = "Disable Blood Filth Generation";
 		public const string KILL_HIT = "Kill Supposedly-Dead Pawns on Hit";
 		public const string SELF_TEND = "Self-Tend While Incapacitated";
-		public const string DESTROY_THRESHOLD = "Body Part Destroy Threshold";
+
+		public static int MaxInjuries = 1000;
+		public static string MaxInjuries_Buffer = null;
+
+		public static float DestroyThreshold = 10000f;
+		public static string DestroyThreshold_Buffer = null;
 
 		public static bool Player_NoDeath = true;
 		public static bool Player_DeathWake = false;
@@ -91,7 +97,7 @@ namespace RW_ThePacifier
 		public static bool Player_DeadBloodless = true;
 		public static bool Player_NoBlood = false;
 		public static bool Player_KillHit = false;
-		public static bool Player_SelfTend = true;
+		public static bool Player_SelfTend = false;
 
 		public static bool Ally_NoDeath = true;
 		public static bool Ally_DeathWake = true;
@@ -118,7 +124,7 @@ namespace RW_ThePacifier
 		public static bool Wild_DeadBloodless = false;
 		public static bool Wild_NoBlood = false;
 		public static bool Wild_KillHit = false;
-		public static bool Wild_SelfTend = true;
+		public static bool Wild_SelfTend = false;
 
 		public static void DoWindowContents(Rect inRect)
 		{
@@ -128,6 +134,12 @@ namespace RW_ThePacifier
 			{
 				if (DestroyThreshold_Buffer == null)
 					DestroyThreshold_Buffer = DestroyThreshold.ToString();
+
+				if (MaxInjuries_Buffer == null)
+					MaxInjuries_Buffer = MaxInjuries.ToString();
+
+				gui.Label(MAX_INJURIES, tooltip: DESCRIPTION_MAX_INJURIES);
+				gui.IntEntry(ref MaxInjuries, ref MaxInjuries_Buffer);
 
 				gui.Label(DESTROY_THRESHOLD, tooltip: DESCRIPTION_DESTROY_THRESHOLD);
 				gui.TextFieldNumeric(ref DestroyThreshold, ref DestroyThreshold_Buffer);
@@ -251,6 +263,7 @@ namespace RW_ThePacifier
 		{
 			base.ExposeData();
 
+			Scribe_Values.Look(ref MaxInjuries, "MaxInjuries", MaxInjuries, true);
 			Scribe_Values.Look(ref DestroyThreshold, "DestroyThreshold", DestroyThreshold, true);
 
 			Scribe_Values.Look(ref Player_NoDeath, "Player_NoDeath", Player_NoDeath, true);

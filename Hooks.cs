@@ -90,6 +90,16 @@ namespace RW_ThePacifier
 								 DamageInfo dinfo,
 								 float totalDamageDealt)
 		{
+			if (___pawn.Destroyed)
+				return true;
+
+			if (___pawn.Dead)
+				return true;
+
+			if (Settings.MaxInjuries > 0 &&
+				__instance.hediffSet.hediffs.Count > Settings.MaxInjuries)
+				return true;
+
 			bool NoDeath =
 				___pawn.Faction == null ?
 					Settings.Wild_NoDeath :
@@ -99,10 +109,7 @@ namespace RW_ThePacifier
 					Settings.Enemy_NoDeath :
 					Settings.Ally_NoDeath;
 
-			if (!NoDeath || ___pawn.Destroyed)
-				return true;
-
-			if (___pawn.Dead)
+			if (!NoDeath)
 				return true;
 
 			Traverse traverse = Traverse.Create(__instance);
@@ -275,6 +282,10 @@ namespace RW_ThePacifier
 			DamageInfo? dinfo,
 			Hediff hediff)
 		{
+			if (Settings.MaxInjuries > 0 &&
+				instance.hediffSet.hediffs.Count > Settings.MaxInjuries)
+				return true;
+
 			bool NoDeath =
 				pawn.Faction == null ?
 					Settings.Wild_NoDeath :
@@ -288,9 +299,6 @@ namespace RW_ThePacifier
 				return true;
 
 			Traverse traverse = Traverse.Create(instance);
-
-			if (instance.Dead)
-				return false;
 
 			if (!instance.Downed)
 			{
@@ -411,7 +419,7 @@ namespace RW_ThePacifier
 			if (!SelfTend)
 				return;
 
-			if (!pawn.playerSettings.selfTend)
+			if (pawn.playerSettings != null && !pawn.playerSettings.selfTend)
 				return;
 
 			if (pawn.WorkTypeIsDisabled(WorkTypeDefOf.Doctor))
@@ -436,6 +444,9 @@ namespace RW_ThePacifier
 			DamageInfo? dinfo,
 			Hediff hediff)
 		{
+			if (___pawn.Dead)
+				return true;
+
 			Patch_NoScar(__instance, ___pawn);
 			bool result = Patch_NoDeath_DeathWake(__instance, ___pawn, dinfo, hediff);
 			Patch_SelfTend(___pawn);
