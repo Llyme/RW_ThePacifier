@@ -7,7 +7,7 @@ namespace RW_ThePacifier
 	{
 		public static bool CanFlee(this Pawn pawn) => pawn.RaceProps.Humanlike && !pawn.IsColonist;
 
-		public static void SetDowned(this Pawn_HealthTracker self,
+		public static void MakeDowned(this Pawn_HealthTracker self,
 									 DamageInfo? dinfo = null,
 									 Hediff hediff = null)
 		{
@@ -15,7 +15,7 @@ namespace RW_ThePacifier
 				.Invoke(self, new object[] { dinfo, hediff });
 		}
 
-		public static void SetUndowned(this Pawn_HealthTracker self)
+		public static void MakeUndowned(this Pawn_HealthTracker self)
 		{
 			AccessTools.Method(typeof(Pawn_HealthTracker), "MakeUndowned")?
 				.Invoke(self, null);

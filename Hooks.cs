@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using RimWorld;
+using RimWorld.Planet;
 using System.Collections.Generic;
 using UnityEngine;
 using Verse;
@@ -7,6 +8,16 @@ using Verse.AI;
 
 namespace RW_ThePacifier
 {
+	[HarmonyPatch(typeof(PawnGenerator), "GenerateInitialHediffs")]
+	public class Patch_PawnGenerator_GenerateInitialHediffs
+	{
+		[HarmonyPostfix]
+		public static void Patch(Pawn pawn, PawnGenerationRequest request)
+		{
+			Patch_Pawn_HealthTracker_CheckForStateChange.Patch_NoScar(pawn.health, pawn);
+		}
+	}
+
 	[HarmonyPatch(typeof(HediffSet), "GetPartHealth")]
 	public class Patch_HediffSet_GetPartHealth
 	{
@@ -29,7 +40,7 @@ namespace RW_ThePacifier
 			foreach (Hediff hediff in __instance.hediffs)
 				if (hediff.Part == part &&
 					hediff is Hediff_Injury injury &&
-					injury.Severity >= 10000)
+					injury.Severity >= Settings.DestroyThreshold)
 					return; // Most likely being amputated via operation bill.
 
 			if (part.def.destroyableByDamage)
@@ -47,6 +58,16 @@ namespace RW_ThePacifier
 								 DamageInfo dinfo,
 								 float totalDamageDealt)
 		{
+			if (___pawn.Destroyed)
+				return true;
+
+			if (___pawn.Dead)
+				return true;
+
+			if (Settings.MaxInjuries > 0 &&
+				__instance.hediffSet.hediffs.Count > Settings.MaxInjuries)
+				return true;
+
 			bool NoDeath =
 				___pawn.Faction == null ?
 					Settings.Wild_NoDeath :
@@ -56,7 +77,7 @@ namespace RW_ThePacifier
 					Settings.Enemy_NoDeath :
 					Settings.Ally_NoDeath;
 
-			if (!NoDeath || ___pawn.Destroyed)
+			if (!NoDeath)
 				return true;
 
 			Traverse traverse = Traverse.Create(__instance);
@@ -80,9 +101,45 @@ namespace RW_ThePacifier
 					}
 				}
 				else
-					__instance.SetDowned(new DamageInfo?(dinfo));
+					__instance.MakeDowned(new DamageInfo?(dinfo));
 
-			if (dinfo.Def.additionalHediffs != null)
+			Pawn pawn;
+
+			if (dinfo.Def.additionalHediffs != null &&
+				(dinfo.Def.applyAdditionalHediffsIfHuntingForFood ||
+				(pawn = dinfo.Instigator as Pawn) == null ||
+				pawn.CurJob == null ||
+				pawn.CurJob.def != JobDefOf.PredatorHunt))
+			{
+				List<DamageDefAdditionalHediff> additionalHediffs = dinfo.Def.additionalHediffs;
+
+				for (int i = 0; i < additionalHediffs.Count; i++)
+				{
+					DamageDefAdditionalHediff damageDefAdditionalHediff = additionalHediffs[i];
+
+					if (damageDefAdditionalHediff.hediff != null)
+					{
+						float num = (damageDefAdditionalHediff.severityFixed <= 0f)
+							? (totalDamageDealt * damageDefAdditionalHediff.severityPerDamageDealt)
+							: damageDefAdditionalHediff.severityFixed;
+
+						if (damageDefAdditionalHediff.victimSeverityScalingByInvBodySize)
+							num *= 1f / ___pawn.BodySize;
+
+						if (damageDefAdditionalHediff.victimSeverityScaling != null)
+							num *= ___pawn.GetStatValue(damageDefAdditionalHediff.victimSeverityScaling, true);
+						
+						if (num >= 0f)
+						{
+							Hediff hediff = HediffMaker.MakeHediff(damageDefAdditionalHediff.hediff, ___pawn, null);
+							hediff.Severity = num;
+							__instance.AddHediff(hediff, null, new DamageInfo?(dinfo), null);
+						}
+					}
+				}
+			}
+
+			/*if (dinfo.Def.additionalHediffs != null)
 				foreach (DamageDefAdditionalHediff dmg in dinfo.Def.additionalHediffs)
 					if (dmg.hediff != null)
 					{
@@ -98,7 +155,7 @@ namespace RW_ThePacifier
 
 							__instance.AddHediff(hediff, null, new DamageInfo?(dinfo), null);
 						}
-					}
+					}*/
 
 			return false;
 		}
@@ -120,142 +177,249 @@ namespace RW_ThePacifier
 					Settings.Enemy_NoBlood :
 					Settings.Ally_NoBlood;
 
-			return !NoBlood;
+			if (NoBlood)
+				return false;
+
+			Traverse traverse = Traverse.Create(___pawn.health);
+
+			if (!traverse.ShouldBeDead())
+				return true;
+
+			bool DeadBloodless =
+				___pawn.Faction == null ?
+					Settings.Wild_DeadBloodless :
+				___pawn.Faction.IsPlayer ?
+					Settings.Player_DeadBloodless :
+				___pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
+					Settings.Enemy_DeadBloodless :
+					Settings.Ally_DeadBloodless;
+
+			return !DeadBloodless;
 		}
 	}
 
 	[HarmonyPatch(typeof(Pawn_HealthTracker), "CheckForStateChange")]
 	public class Patch_Pawn_HealthTracker_CheckForStateChange
 	{
-		[HarmonyPriority(Priority.Last)]
-		[HarmonyPrefix]
-		public static bool Patch(Pawn_HealthTracker __instance,
-								 Pawn ___pawn,
-								 DamageInfo? dinfo,
-								 Hediff hediff)
+		public static void Patch_NoScar
+			(Pawn_HealthTracker instance,
+			Pawn pawn)
 		{
-			if (__instance.Dead)
-				return true;
-
 			bool NoScar =
-				___pawn.Faction == null ?
+				pawn.Faction == null ?
 					Settings.Wild_NoScar :
-				___pawn.Faction.IsPlayer ?
+				pawn.Faction.IsPlayer ?
 					Settings.Player_NoScar :
-				___pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
+				pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
 					Settings.Enemy_NoScar :
 					Settings.Ally_NoScar;
 
+			if (!NoScar)
+				return;
+
+			List<Hediff> list = instance.hediffSet.hediffs;
+			int i = list.Count - 1;
+
+			while (i >= 0)
+			{
+				Hediff hediff1 = list[i];
+
+				if (hediff1.IsPermanent())
+				{
+					list.Remove(hediff1);
+
+					Hediff newHediff = HediffMaker.MakeHediff(
+						hediff1.def,
+						pawn,
+						hediff1.Part
+					);
+					newHediff.Severity = hediff1.Severity;
+
+					list.Add(newHediff);
+				}
+
+				i--;
+			}
+
+			return;
+		}
+
+		public static bool Patch_NoDeath_DeathWake
+			(Pawn_HealthTracker instance,
+			Pawn pawn,
+			DamageInfo? dinfo,
+			Hediff hediff)
+		{
+			if (Settings.MaxInjuries > 0 &&
+				instance.hediffSet.hediffs.Count > Settings.MaxInjuries)
+				return true;
+
 			bool NoDeath =
-				___pawn.Faction == null ?
+				pawn.Faction == null ?
 					Settings.Wild_NoDeath :
-				___pawn.Faction.IsPlayer ?
+				pawn.Faction.IsPlayer ?
 					Settings.Player_NoDeath :
-				___pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
+				pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
 					Settings.Enemy_NoDeath :
 					Settings.Ally_NoDeath;
-
-			if (NoScar)
-			{
-				List<Hediff> list = __instance.hediffSet.hediffs;
-				int i = list.Count - 1;
-
-				while (i >= 0)
-				{
-					Hediff hediff1 = list[i];
-
-					if (hediff1.IsPermanent())
-					{
-						list.Remove(hediff1);
-
-						Hediff newHediff = HediffMaker.MakeHediff(
-							hediff1.def,
-							___pawn,
-							hediff1.Part
-						);
-						newHediff.Severity = hediff1.Severity;
-
-						list.Add(newHediff);
-					}
-
-					i--;
-				}
-			}
 
 			if (!NoDeath)
 				return true;
 
-			Traverse traverse = Traverse.Create(__instance);
+			Traverse traverse = Traverse.Create(instance);
 
-			if (!__instance.Downed)
+			if (!instance.Downed)
 			{
 				if (traverse.ShouldBeDead() || traverse.ShouldBeDowned())
 				{
-					__instance.forceIncap = false;
+					instance.forceIncap = false;
 
-					if (___pawn.mindState.duty == null ||
-						___pawn.mindState.duty.def != DutyDefOf.ExitMapBest)
-						__instance.SetDowned(dinfo, hediff);
+					if (pawn.mindState.duty == null ||
+						pawn.mindState.duty.def != DutyDefOf.ExitMapBest)
+						instance.MakeDowned(dinfo, hediff);
 
 					return false;
 				}
 
-				if (!__instance.capacities.CapableOf(PawnCapacityDefOf.Manipulation))
+				if (!instance.capacities.CapableOf(PawnCapacityDefOf.Manipulation))
 				{
-					if (___pawn.carryTracker != null &&
-						___pawn.carryTracker.CarriedThing != null &&
-						___pawn.jobs != null &&
-						___pawn.CurJob != null)
-						___pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, true);
+					if (pawn.carryTracker != null &&
+						pawn.carryTracker.CarriedThing != null &&
+						pawn.jobs != null &&
+						pawn.CurJob != null)
+						pawn.jobs.EndCurrentJob(JobCondition.InterruptForced, true, true);
 
-					if (___pawn.equipment != null && ___pawn.equipment.Primary != null)
-						if (___pawn.kindDef.destroyGearOnDrop)
-							___pawn.equipment.DestroyEquipment(___pawn.equipment.Primary);
-						else if (___pawn.InContainerEnclosed)
-							___pawn.equipment.TryTransferEquipmentToContainer(
-								___pawn.equipment.Primary,
-								___pawn.holdingOwner
+					if (pawn.equipment != null &&
+						pawn.equipment.Primary != null)
+					{
+						if (pawn.kindDef.destroyGearOnDrop)
+						{
+							pawn.equipment.DestroyEquipment(pawn.equipment.Primary);
+							return false;
+						}
+
+						if (pawn.InContainerEnclosed)
+						{
+							pawn.equipment.TryTransferEquipmentToContainer(
+								pawn.equipment.Primary,
+								pawn.holdingOwner
 							);
-						else if (___pawn.SpawnedOrAnyParentSpawned)
-							___pawn.equipment.TryDropEquipment(
-								___pawn.equipment.Primary,
-								out var _,
-								___pawn.PositionHeld,
+							return false;
+						}
+
+						if (pawn.SpawnedOrAnyParentSpawned)
+						{
+							pawn.equipment.TryDropEquipment(
+								pawn.equipment.Primary,
+								out ThingWithComps _,
+								pawn.PositionHeld,
 								true
 							);
-						else
-							___pawn.equipment.DestroyEquipment(___pawn.equipment.Primary);
+							return false;
+						}
+
+						if (!pawn.IsCaravanMember())
+						{
+							pawn.equipment.DestroyEquipment(pawn.equipment.Primary);
+							return false;
+						}
+
+						ThingWithComps primary = pawn.equipment.Primary;
+						pawn.equipment.Remove(primary);
+
+						if (!pawn.inventory.innerContainer.TryAdd(primary, true))
+						{
+							primary.Destroy(DestroyMode.Vanish);
+							return false;
+						}
+					}
 				}
 			}
 			else if (!traverse.ShouldBeDowned())
 			{
-				__instance.SetUndowned();
+				instance.MakeUndowned();
+				return false;
 			}
-			else if (___pawn.CarriedBy == null)
+			else if (pawn.CarriedBy == null)
 			{
 				bool DeathWake =
-					___pawn.Faction == null ?
+					pawn.Faction == null ?
 						Settings.Wild_DeathWake :
-					___pawn.Faction.IsPlayer ?
+					pawn.Faction.IsPlayer ?
 						Settings.Player_DeathWake :
-					___pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
+					pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
 						Settings.Enemy_DeathWake :
 						Settings.Ally_DeathWake;
 
 				if (!DeathWake ||
-					Rand.Value >= __instance.summaryHealth.SummaryHealthPercent / 4)
+					Rand.Value >= instance.summaryHealth.SummaryHealthPercent / 4)
 					return false;
 
-				__instance.SetUndowned();
+				instance.MakeUndowned();
 
-				if (!___pawn.Faction.IsPlayer)
-					___pawn.mindState.duty = new PawnDuty(DutyDefOf.ExitMapBest)
+				if (!pawn.Faction.IsPlayer)
+					pawn.mindState.duty = new PawnDuty(DutyDefOf.ExitMapBest)
 					{
 						locomotion = LocomotionUrgency.Sprint
 					};
 			}
 
 			return false;
+		}
+
+		public static void Patch_SelfTend(Pawn pawn)
+		{
+			if (!pawn.health.Downed)
+				return;
+
+			bool SelfTend =
+				pawn.Faction == null ?
+					Settings.Wild_SelfTend :
+				pawn.Faction.IsPlayer ?
+					Settings.Player_SelfTend :
+				pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
+					Settings.Enemy_SelfTend :
+					Settings.Ally_SelfTend;
+
+			if (!SelfTend)
+				return;
+
+			if (pawn.playerSettings != null && !pawn.playerSettings.selfTend)
+				return;
+
+			if (pawn.WorkTypeIsDisabled(WorkTypeDefOf.Doctor))
+				return;
+
+			if (!pawn.health.HasHediffsNeedingTend())
+				return;
+
+			if (pawn.CurJobDef != JobDefOf.TendPatient)
+			{
+				Job job = JobMaker.MakeJob(JobDefOf.TendPatient, pawn);
+				job.endAfterTendedOnce = true;
+				pawn.jobs.StartJob(job);
+			}
+		}
+
+		[HarmonyPriority(Priority.Last)]
+		[HarmonyPrefix]
+		public static bool Patch
+			(Pawn_HealthTracker __instance,
+			Pawn ___pawn,
+			DamageInfo? dinfo,
+			Hediff hediff)
+		{
+			if (!___pawn.Spawned)
+				return true;
+
+			if (___pawn.Dead)
+				return true;
+
+			Patch_NoScar(__instance, ___pawn);
+			bool result = Patch_NoDeath_DeathWake(__instance, ___pawn, dinfo, hediff);
+			Patch_SelfTend(___pawn);
+
+			return result;
 		}
 	}
 }
