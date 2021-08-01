@@ -8,47 +8,15 @@ using Verse.AI;
 
 namespace RW_ThePacifier
 {
-	/*[HarmonyPatch(typeof(Pawn_JobTracker), "TryFindAndStartJob")]
-	public class Patch_Pawn_JobTracker_TryFindAndStartJob
+	[HarmonyPatch(typeof(PawnGenerator), "GenerateInitialHediffs")]
+	public class Patch_PawnGenerator_GenerateInitialHediffs
 	{
-		[HarmonyPriority(Priority.Last)]
-		[HarmonyPrefix]
-		public static bool Patch(Pawn ___pawn)
+		[HarmonyPostfix]
+		public static void Patch(Pawn pawn, PawnGenerationRequest request)
 		{
-			if (!___pawn.health.Downed)
-				return true;
-
-			bool SelfTend =
-				___pawn.Faction == null ?
-					Settings.Wild_SelfTend :
-				___pawn.Faction.IsPlayer ?
-					Settings.Player_SelfTend :
-				___pawn.Faction.HostileTo(Faction.OfPlayerSilentFail) ?
-					Settings.Enemy_SelfTend :
-					Settings.Ally_SelfTend;
-
-			if (!SelfTend)
-				return true;
-
-			if (!___pawn.playerSettings.selfTend)
-				return true;
-
-			if (___pawn.WorkTypeIsDisabled(WorkTypeDefOf.Doctor))
-				return true;
-
-			if (!___pawn.health.HasHediffsNeedingTend())
-				return true;
-
-			if (___pawn.CurJobDef != JobDefOf.TendPatient)
-			{
-				Job job = JobMaker.MakeJob(JobDefOf.TendPatient, ___pawn);
-				job.endAfterTendedOnce = true;
-				___pawn.jobs.StartJob(job);
-			}
-
-			return false;
+			Patch_Pawn_HealthTracker_CheckForStateChange.Patch_NoScar(pawn.health, pawn);
 		}
-	}*/
+	}
 
 	[HarmonyPatch(typeof(HediffSet), "GetPartHealth")]
 	public class Patch_HediffSet_GetPartHealth
@@ -401,9 +369,6 @@ namespace RW_ThePacifier
 
 		public static void Patch_SelfTend(Pawn pawn)
 		{
-			if (!pawn.Spawned)
-				return;
-
 			if (!pawn.health.Downed)
 				return;
 
@@ -444,6 +409,9 @@ namespace RW_ThePacifier
 			DamageInfo? dinfo,
 			Hediff hediff)
 		{
+			if (!___pawn.Spawned)
+				return true;
+
 			if (___pawn.Dead)
 				return true;
 
