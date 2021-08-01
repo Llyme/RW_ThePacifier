@@ -385,12 +385,19 @@ namespace RW_ThePacifier
 				return;
 
 			if (pawn.playerSettings != null && !pawn.playerSettings.selfTend)
+				// Player did not allow this pawn to self-tend.
+				return;
+
+			if (pawn.workSettings == null)
+				// This pawn is unable to work.
 				return;
 
 			if (pawn.WorkTypeIsDisabled(WorkTypeDefOf.Doctor))
+				// This pawn is not assigned for doctoring.
 				return;
 
 			if (!pawn.health.HasHediffsNeedingTend())
+				// This pawn has no injuries that need tending.
 				return;
 
 			if (pawn.CurJobDef != JobDefOf.TendPatient)
