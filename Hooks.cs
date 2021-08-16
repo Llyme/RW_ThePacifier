@@ -14,7 +14,7 @@ namespace RW_ThePacifier
 		[HarmonyPostfix]
 		public static void Patch(Pawn pawn, PawnGenerationRequest request)
 		{
-			Patch_Pawn_HealthTracker_CheckForStateChange.Patch_NoScar(pawn.health, pawn);
+			Patch_Pawn_HealthTracker_CheckForStateChange.Patch_NoScar(pawn.health, pawn, false);
 		}
 	}
 
@@ -203,8 +203,12 @@ namespace RW_ThePacifier
 	{
 		public static void Patch_NoScar
 			(Pawn_HealthTracker instance,
-			Pawn pawn)
+			Pawn pawn,
+			bool spawnedOnly)
 		{
+			if (spawnedOnly && !pawn.Spawned)
+				return;
+
 			bool NoScar =
 				pawn.Faction == null ?
 					Settings.Wild_NoScar :
@@ -369,6 +373,9 @@ namespace RW_ThePacifier
 
 		public static void Patch_SelfTend(Pawn pawn)
 		{
+			if (!pawn.Spawned)
+				return;
+
 			if (!pawn.health.Downed)
 				return;
 
@@ -416,13 +423,10 @@ namespace RW_ThePacifier
 			DamageInfo? dinfo,
 			Hediff hediff)
 		{
-			if (!___pawn.Spawned)
-				return true;
-
 			if (___pawn.Dead)
 				return true;
 
-			Patch_NoScar(__instance, ___pawn);
+			Patch_NoScar(__instance, ___pawn, true);
 			bool result = Patch_NoDeath_DeathWake(__instance, ___pawn, dinfo, hediff);
 			Patch_SelfTend(___pawn);
 
