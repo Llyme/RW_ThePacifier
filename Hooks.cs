@@ -407,8 +407,9 @@ namespace RW_ThePacifier
 				// This pawn has no injuries that need tending.
 				return;
 
-			if (pawn.CurJobDef != JobDefOf.TendPatient)
+			if (pawn.CurJobDef == JobDefOf.Wait_Downed)
 			{
+				// Only allow self-tending if the pawn is only waiting.
 				Job job = JobMaker.MakeJob(JobDefOf.TendPatient, pawn);
 				job.endAfterTendedOnce = true;
 				pawn.jobs.StartJob(job);
