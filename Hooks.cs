@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using RimWorld;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,28 +7,6 @@ using Verse.AI;
 
 namespace RW_ThePacifier
 {
-	[HarmonyPatch(typeof(JobDriver_TendPatient), "MakeNewToils")]
-	public class Patch_JobDriver_TendPatient_MakeNewToils
-	{
-		[HarmonyPriority(Priority.Last)]
-		[HarmonyPostfix]
-		public static void Patch()
-		{
-			Log.Message("OMEGA LUL");
-		}
-	}
-
-	[HarmonyPatch(typeof(Pawn_JobTracker), "TryFindAndStartJob")]
-	public class Patch_Pawn_JobTracker_TryFindAndStartJob
-	{
-		[HarmonyPriority(Priority.Last)]
-		[HarmonyPostfix]
-		public static void Patch()
-		{
-			Log.Message("RAWRXD");
-		}
-	}
-
 	[HarmonyPatch(typeof(HediffSet), "GetPartHealth")]
 	public class Patch_HediffSet_GetPartHealth
 	{
