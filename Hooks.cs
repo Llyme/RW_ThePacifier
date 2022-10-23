@@ -14,7 +14,7 @@ namespace RW_ThePacifier
 		[HarmonyPostfix]
 		public static void Patch(Pawn pawn, PawnGenerationRequest request)
 		{
-			Patch_Pawn_HealthTracker_CheckForStateChange.Patch_NoScar(pawn.health, pawn);
+			Patch_Pawn_HealthTracker_CheckForStateChange.Patch_NoScar(pawn.health, pawn, false);
 		}
 	}
 
@@ -203,8 +203,12 @@ namespace RW_ThePacifier
 	{
 		public static void Patch_NoScar
 			(Pawn_HealthTracker instance,
-			Pawn pawn)
+			Pawn pawn,
+			bool spawnedOnly)
 		{
+			if (spawnedOnly && !pawn.Spawned)
+				return;
+
 			bool NoScar =
 				pawn.Faction == null ?
 					Settings.Wild_NoScar :
@@ -369,6 +373,9 @@ namespace RW_ThePacifier
 
 		public static void Patch_SelfTend(Pawn pawn)
 		{
+			if (!pawn.Spawned)
+				return;
+
 			if (!pawn.health.Downed)
 				return;
 
@@ -385,16 +392,24 @@ namespace RW_ThePacifier
 				return;
 
 			if (pawn.playerSettings != null && !pawn.playerSettings.selfTend)
+				// Player did not allow this pawn to self-tend.
+				return;
+
+			if (pawn.workSettings == null)
+				// This pawn is unable to work.
 				return;
 
 			if (pawn.WorkTypeIsDisabled(WorkTypeDefOf.Doctor))
+				// This pawn is not assigned for doctoring.
 				return;
 
 			if (!pawn.health.HasHediffsNeedingTend())
+				// This pawn has no injuries that need tending.
 				return;
 
-			if (pawn.CurJobDef != JobDefOf.TendPatient)
+			if (pawn.CurJobDef == JobDefOf.Wait_Downed)
 			{
+				// Only allow self-tending if the pawn is only waiting.
 				Job job = JobMaker.MakeJob(JobDefOf.TendPatient, pawn);
 				job.endAfterTendedOnce = true;
 				pawn.jobs.StartJob(job);
@@ -409,13 +424,10 @@ namespace RW_ThePacifier
 			DamageInfo? dinfo,
 			Hediff hediff)
 		{
-			if (!___pawn.Spawned)
-				return true;
-
 			if (___pawn.Dead)
 				return true;
 
-			Patch_NoScar(__instance, ___pawn);
+			Patch_NoScar(__instance, ___pawn, true);
 			bool result = Patch_NoDeath_DeathWake(__instance, ___pawn, dinfo, hediff);
 			Patch_SelfTend(___pawn);
 
