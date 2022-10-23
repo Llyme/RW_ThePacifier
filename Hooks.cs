@@ -276,7 +276,7 @@ namespace RW_ThePacifier
 			{
 				if (traverse.ShouldBeDead() || traverse.ShouldBeDowned())
 				{
-					instance.forceIncap = false;
+					instance.forceDowned = false;
 
 					if (pawn.mindState.duty == null ||
 						pawn.mindState.duty.def != DutyDefOf.ExitMapBest)
