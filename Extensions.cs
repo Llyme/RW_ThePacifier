@@ -18,7 +18,7 @@ namespace RW_ThePacifier
 		public static void MakeUndowned(this Pawn_HealthTracker self)
 		{
 			AccessTools.Method(typeof(Pawn_HealthTracker), "MakeUndowned")?
-				.Invoke(self, null);
+				.Invoke(self, new object[] { null });
 		}
 
 		public static bool ShouldBeDowned(this Traverse self)
